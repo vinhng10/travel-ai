@@ -1,79 +1,115 @@
 import React, { useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Button } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
-import { Image } from "expo-image";
-import * as FileSystem from "expo-file-system";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 
 const CameraScreen = () => {
   const [permission, requestPermission] = useCameraPermissions();
-  const [image, setImage] = useState(null);
+  const [image, setImage] = useState<string | null>(null);
   const cameraRef = useRef(null);
   const router = useRouter();
 
-  if (!permission) {
-    // Camera permissions are still loading.
-    return <View />;
-  }
+  // if (!permission) {
+  //   return <View />;
+  // }
 
-  if (!permission.granted) {
-    // Camera permissions are not granted yet.
-    return (
-      <View style={styles.container}>
-        <Text style={styles.message}>
-          We need your permission to show the camera
-        </Text>
-        <Button onPress={requestPermission} title="Grant Permission" />
-      </View>
-    );
-  }
+  // if (!permission.granted) {
+  //   // Camera permissions are not granted yet.
+  //   return (
+  //     <View style={styles.container}>
+  //       <Text style={styles.message}>
+  //         We need your permission to show the camera
+  //       </Text>
+  //       <Button onPress={requestPermission} title="Grant Permission" />
+  //     </View>
+  //   );
+  // }
 
   const handleTakePhoto = async () => {
     try {
       if (cameraRef.current) {
         // Take a picture and get the file URI
         const photo = await cameraRef.current.takePictureAsync({
-          // base64: true,
+          base64: true,
         });
+        // Calculate the aspect ratio
+        const aspectRatio = photo.width / photo.height;
 
-        const response = await FileSystem.uploadAsync(
-          `https://api.bing.microsoft.com/v7.0/images/visualsearch`,
+        // Calculate new dimensions
+        let newWidth = 1000;
+        let newHeight = 1000;
+
+        if (aspectRatio > 1) {
+          // Image is wider than it is tall
+          newHeight = newWidth / aspectRatio;
+        } else {
+          // Image is taller than it is wide
+          newWidth = newHeight * aspectRatio;
+        }
+        const resizedPhoto = await manipulateAsync(
           photo.uri,
-          {
-            fieldName: "image",
-            mimeType: "image/jpeg",
-            httpMethod: "POST",
-            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-            headers: {
-              "Ocp-Apim-Subscription-Key": "18afbf95480e4de897c64e2bd860d660",
-            },
-          }
+          [{ resize: { width: newWidth, height: newHeight } }],
+          { compress: 1, format: SaveFormat.JPEG }
         );
-        console.log(JSON.stringify(response, null, 4));
+
+        try {
+          // Create a new FormData object
+          const formData = new FormData();
+
+          // Append the blob to the FormData object
+          formData.append("image", {
+            uri: resizedPhoto.uri,
+            type: "image/jpeg",
+            name: "image.jpg",
+          });
+
+          // Make the POST request to your server
+          const response = await fetch(
+            "https://api.bing.microsoft.com/v7.0/images/visualsearch",
+            {
+              method: "POST",
+              body: formData,
+              headers: {
+                "Ocp-Apim-Subscription-Key": "",
+              },
+            }
+          );
+
+          // Check if the request was successful
+          if (response.ok) {
+            const responseData = await response.json();
+            // console.log(
+            //   JSON.stringify(responseData["tags"][0]["actions"], null, 2)
+            // );
+            const results = [];
+            for (let i in responseData["tags"][0]["actions"]) {
+              const action = responseData["tags"][0]["actions"][i];
+              if (
+                action["_type"] == "ImageModuleAction" &&
+                action["actionType"] == "VisualSearch"
+              ) {
+                for (let j in action["data"]["value"]) {
+                  const value = action["data"]["value"][j];
+                  results.push(value["name"]);
+                }
+              }
+            }
+
+            // results.slice(0, 5).forEach((r) => console.log(r));
+          } else {
+            console.error("Error uploading image:", response.statusText);
+          }
+        } catch (error) {
+          console.log(error);
+        }
       }
     } catch (error) {
       console.log(error);
     }
   };
 
-  return image ? (
-    <View style={styles.imageContainer}>
-      <Image
-        style={styles.image}
-        source={image}
-        contentFit="cover"
-        transition={1000}
-      />
-      <TouchableOpacity
-        style={styles.roundButton}
-        onPress={() => {
-          setImage(null);
-        }}
-      >
-        <Text style={styles.text}>Return</Text>
-      </TouchableOpacity>
-    </View>
-  ) : (
+  return (
     <View style={styles.container}>
       {/* Upper section with the camera stream */}
       <CameraView ref={cameraRef} style={styles.camera} facing={"back"} />
@@ -91,44 +127,51 @@ const CameraScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000", // Ensures the whole screen background is black
+  },
+  imageContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
   },
   camera: {
-    flex: 3, // Takes most of the screen
+    flex: 1,
   },
   bottomSection: {
-    flex: 1, // Takes up less space at the bottom
-    backgroundColor: "#333", // Dark background for the bottom section
-    justifyContent: "center", // Center the button vertically
-    alignItems: "center", // Center the button horizontally
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    padding: 20,
+    alignItems: "center",
   },
   roundButton: {
     width: 100,
     height: 100,
+    borderRadius: 50,
+    backgroundColor: "#007AFF",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#00f",
-    borderRadius: 50,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   text: {
-    color: "#fff",
+    color: "white",
     fontSize: 16,
+    fontWeight: "bold",
   },
   message: {
     fontSize: 18,
     textAlign: "center",
-    color: "#fff", // Ensures text is visible on the black background
-  },
-  imageContainer: {
-    flex: 1,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  image: {
-    flex: 1,
-    width: "100%",
-    backgroundColor: "#0553",
+    margin: 10,
+    color: "#333333",
   },
 });
 
