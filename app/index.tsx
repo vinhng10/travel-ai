@@ -184,7 +184,7 @@ const CameraScreen = () => {
       <View style={styles.bottomSection}>
         <TouchableOpacity
           style={styles.roundButton}
-          onPress={() => {
+          onPress={async () => {
             handleText();
             handleSpeech();
           }}
