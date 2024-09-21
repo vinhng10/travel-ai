@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { Image } from "expo-image";
 
 const CameraScreen = () => {
   const [permission, requestPermission] = useCameraPermissions();
@@ -10,21 +11,40 @@ const CameraScreen = () => {
   const cameraRef = useRef(null);
   const router = useRouter();
 
-  // if (!permission) {
-  //   return <View />;
-  // }
+  if (!permission) {
+    return <View />;
+  }
 
-  // if (!permission.granted) {
-  //   // Camera permissions are not granted yet.
-  //   return (
-  //     <View style={styles.container}>
-  //       <Text style={styles.message}>
-  //         We need your permission to show the camera
-  //       </Text>
-  //       <Button onPress={requestPermission} title="Grant Permission" />
-  //     </View>
-  //   );
-  // }
+  if (!permission.granted) {
+    // Camera permissions are not granted yet.
+    return (
+      <View style={styles.container}>
+        <Text style={styles.message}>
+          We need your permission to show the camera
+        </Text>
+        <TouchableOpacity onPress={requestPermission}>
+          <Text style={styles.text}>Grant Permission</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const parse = (data) => {
+    const results = [];
+    const pageIncludings = data["tags"][0]["actions"].find(
+      (action) => action["actionType"] == "PagesIncluding"
+    );
+    pageIncludings["data"]["value"]
+      .slice(0, 5)
+      .forEach((value) => results.push(value["name"]));
+    const visualSearch = data["tags"][0]["actions"].find(
+      (action) => action["actionType"] == "VisualSearch"
+    );
+    visualSearch["data"]["value"]
+      .slice(0, 5)
+      .forEach((value) => results.push(value["name"]));
+    return results;
+  };
 
   const handleTakePhoto = async () => {
     try {
@@ -37,8 +57,8 @@ const CameraScreen = () => {
         const aspectRatio = photo.width / photo.height;
 
         // Calculate new dimensions
-        let newWidth = 1000;
-        let newHeight = 1000;
+        let newWidth = 1200;
+        let newHeight = 1200;
 
         if (aspectRatio > 1) {
           // Image is wider than it is tall
@@ -53,6 +73,8 @@ const CameraScreen = () => {
           { compress: 1, format: SaveFormat.JPEG }
         );
 
+        setImage(resizedPhoto.uri);
+
         try {
           // Create a new FormData object
           const formData = new FormData();
@@ -66,7 +88,7 @@ const CameraScreen = () => {
 
           // Make the POST request to your server
           const response = await fetch(
-            "https://api.bing.microsoft.com/v7.0/images/visualsearch",
+            "https://api.bing.microsoft.com/v7.0/images/visualsearch?mkt=en-US",
             {
               method: "POST",
               body: formData,
@@ -78,25 +100,9 @@ const CameraScreen = () => {
 
           // Check if the request was successful
           if (response.ok) {
-            const responseData = await response.json();
-            // console.log(
-            //   JSON.stringify(responseData["tags"][0]["actions"], null, 2)
-            // );
-            const results = [];
-            for (let i in responseData["tags"][0]["actions"]) {
-              const action = responseData["tags"][0]["actions"][i];
-              if (
-                action["_type"] == "ImageModuleAction" &&
-                action["actionType"] == "VisualSearch"
-              ) {
-                for (let j in action["data"]["value"]) {
-                  const value = action["data"]["value"][j];
-                  results.push(value["name"]);
-                }
-              }
-            }
-
-            // results.slice(0, 5).forEach((r) => console.log(r));
+            const data = await response.json();
+            const results = parse(data);
+            console.log(results.map((r, i) => `${i+1}. ${r}`).join("\n"));
           } else {
             console.error("Error uploading image:", response.statusText);
           }
@@ -109,12 +115,23 @@ const CameraScreen = () => {
     }
   };
 
-  return (
+  return image ? (
     <View style={styles.container}>
-      {/* Upper section with the camera stream */}
+      <Image style={styles.camera} source={image} />
+      <View style={styles.bottomSection}>
+        <TouchableOpacity
+          style={styles.roundButton}
+          onPress={() => {
+            setImage(null);
+          }}
+        >
+          <Text style={styles.text}>Reset</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  ) : (
+    <View style={styles.container}>
       <CameraView ref={cameraRef} style={styles.camera} facing={"back"} />
-
-      {/* Bottom section with the button */}
       <View style={styles.bottomSection}>
         <TouchableOpacity style={styles.roundButton} onPress={handleTakePhoto}>
           <Text style={styles.text}>Take Photo</Text>
@@ -138,16 +155,13 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   camera: {
-    flex: 1,
+    flex: 10,
   },
   bottomSection: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    padding: 20,
+    flex: 2, // 20% of the screen for the button
+    justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   roundButton: {
     width: 100,
@@ -156,11 +170,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   text: {
     color: "white",
