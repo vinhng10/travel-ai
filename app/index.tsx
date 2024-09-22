@@ -1,8 +1,10 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
+import { Audio } from "expo-av";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import * as FileSystem from "expo-file-system";
 import { Image } from "expo-image";
 import EventSource from "react-native-sse";
 
@@ -11,6 +13,8 @@ const CameraScreen = () => {
   const [image, setImage] = useState<string | null>(null);
   const cameraRef = useRef(null);
   const router = useRouter();
+  const [queue, setQueue] = useState<string[]>([]);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const parse = (data) => {
     const results: string[] = [];
@@ -31,64 +35,7 @@ const CameraScreen = () => {
 
   const handleText = async () => {
     try {
-      if (!cameraRef.current) return;
-
-      // Take a picture and get the file URI
-      const photo = await cameraRef.current.takePictureAsync({
-        base64: true,
-      });
-      // Calculate the aspect ratio
-      const aspectRatio = photo.width / photo.height;
-
-      // Calculate new dimensions
-      let newWidth = 1200;
-      let newHeight = 1200;
-
-      if (aspectRatio > 1) {
-        // Image is wider than it is tall
-        newHeight = newWidth / aspectRatio;
-      } else {
-        // Image is taller than it is wide
-        newWidth = newHeight * aspectRatio;
-      }
-      const resizedPhoto = await manipulateAsync(
-        photo.uri,
-        [{ resize: { width: newWidth, height: newHeight } }],
-        { compress: 1, format: SaveFormat.JPEG }
-      );
-
-      setImage(resizedPhoto.uri);
-
-      // Create a new FormData object
-      const formData = new FormData();
-
-      // Append the blob to the FormData object
-      formData.append("image", {
-        uri: resizedPhoto.uri,
-        type: "image/jpeg",
-        name: "image.jpg",
-      });
-
-      // Make the POST request to your server
-      const response = await fetch(
-        "https://api.bing.microsoft.com/v7.0/images/visualsearch?mkt=en-US",
-        {
-          method: "POST",
-          body: formData,
-          headers: {
-            "Ocp-Apim-Subscription-Key": "",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw Error(`Error uploading image: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const results = parse(data);
-      console.log(results.map((r, i) => `${i + 1}. ${r}`).join("\n"));
-
+      let text = "";
       const es = new EventSource(
         "https://api.groq.com/openai/v1/chat/completions",
         {
@@ -106,7 +53,7 @@ const CameraScreen = () => {
               },
               {
                 role: "user",
-                content: "Hello.",
+                content: "Tell me a very short story in 3 sentences.",
               },
             ],
             stream: true,
@@ -115,23 +62,26 @@ const CameraScreen = () => {
         }
       );
 
-      es.addEventListener("open", () => {
-        console.log("====> open");
-      });
+      es.addEventListener("open", () => {});
 
-      es.addEventListener("message", (event) => {
+      es.addEventListener("message", async (event) => {
         if (event.data === "[DONE]") {
           es.close();
           return;
         }
-
         const data = JSON.parse(event.data);
-        if (data.choices[0].delta.content !== undefined) {
-          console.log(data.choices[0].delta.content);
+        const content = data.choices[0].delta.content;
+        if (content !== undefined) {
+          text += content;
         }
       });
 
-      es.addEventListener("close", () => {
+      es.addEventListener("close", async () => {
+        const sentences = text.split(".");
+        for (let i in sentences) {
+          await enqueue(sentences[i]);
+          await new Promise((r) => setTimeout(r, 1000));
+        }
         es.removeAllEventListeners();
       });
     } catch (error) {
@@ -139,12 +89,91 @@ const CameraScreen = () => {
     }
   };
 
-  const handleSpeech = async () => {
-    while (true) {
-      console.log("Con Cac");
-      await new Promise((r) => setTimeout(r, 1000));
+  const enqueue = async (text: string) => {
+    try {
+      // Make the POST request to the Eleven Labs TTS API
+      const response = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/nPczCjzI2devNBz1zQrb`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "xi-api-key": "",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            text: text,
+            model_id: "eleven_turbo_v2_5",
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.8,
+              style: 0.0,
+              use_speaker_boost: true,
+            },
+          }),
+        }
+      );
+
+      // Check for HTTP errors
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      // Get the audio response
+      const blob = await response.blob();
+
+      // Define the path to save the file
+      const path = `${
+        FileSystem.documentDirectory
+      }${Date.now().toString()}.wav`;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result.split(",")[1];
+        await FileSystem.writeAsStringAsync(path, base64Data, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      };
+      reader.readAsDataURL(blob);
+
+      setQueue([...queue, path]);
+    } catch (error) {
+      console.error(error);
     }
   };
+
+  const handleAudio = async () => {
+    if (queue.length > 0 && !isPlaying) {
+      setIsPlaying(true);
+      const audio = queue[0];
+
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: audio },
+          { shouldPlay: true }
+        );
+
+        await sound.playAsync();
+
+        // Wait for the audio to finish playing
+        let intervalId = setInterval(async () => {
+          const status = await sound.getStatusAsync();
+          if (!status.isPlaying) {
+            await sound.unloadAsync();
+            setQueue((prevQueue) => prevQueue.slice(1));
+            setIsPlaying(false);
+            clearInterval(intervalId);
+          }
+        }, 300);
+      } catch (error) {
+        console.error("Error playing audio:", error);
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    handleAudio();
+  }, [queue, isPlaying]);
 
   if (!permission) {
     return <View />;
@@ -182,13 +211,7 @@ const CameraScreen = () => {
     <View style={styles.container}>
       <CameraView ref={cameraRef} style={styles.camera} facing={"back"} />
       <View style={styles.bottomSection}>
-        <TouchableOpacity
-          style={styles.roundButton}
-          onPress={async () => {
-            handleText();
-            handleSpeech();
-          }}
-        >
+        <TouchableOpacity style={styles.roundButton} onPress={handleText}>
           <Text style={styles.text}>Take Photo</Text>
         </TouchableOpacity>
       </View>
