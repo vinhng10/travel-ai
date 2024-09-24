@@ -11,10 +11,10 @@ import EventSource from "react-native-sse";
 const CameraScreen = () => {
   const [permission, requestPermission] = useCameraPermissions();
   const [image, setImage] = useState<string | null>(null);
-  const cameraRef = useRef(null);
-  const router = useRouter();
   const [queue, setQueue] = useState<string[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
+  const cameraRef = useRef(null);
+  const router = useRouter();
 
   const parse = (data) => {
     const results: string[] = [];
@@ -35,6 +35,57 @@ const CameraScreen = () => {
 
   const handleText = async () => {
     try {
+      if (!cameraRef.current) return;
+      // Take a picture and get the file URI
+      const photo = await cameraRef.current.takePictureAsync({
+        base64: true,
+      });
+
+      // Calculate the aspect ratio
+      const aspectRatio = photo.width / photo.height;
+
+      // Calculate new dimensions
+      let newWidth = 1200;
+      let newHeight = 1200;
+      if (aspectRatio > 1) {
+        newHeight = newWidth / aspectRatio;
+      } else {
+        newWidth = newHeight * aspectRatio;
+      }
+
+      const resizedPhoto = await manipulateAsync(
+        photo.uri,
+        [{ resize: { width: newWidth, height: newHeight } }],
+        { compress: 1, format: SaveFormat.JPEG }
+      );
+      setImage(resizedPhoto.uri);
+
+      // Create a new FormData object
+      const formData = new FormData();
+      formData.append("image", {
+        uri: resizedPhoto.uri,
+        type: "image/jpeg",
+        name: "image.jpg",
+      });
+
+      // Make the POST request to your server
+      const response = await fetch(
+        "https://api.bing.microsoft.com/v7.0/images/visualsearch?mkt=en-US",
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            "Ocp-Apim-Subscription-Key": "",
+          },
+        }
+      );
+      if (!response.ok) {
+        throw Error(`Error uploading image: ${response.statusText}`);
+      }
+      const data = await response.json();
+      const results = parse(data);
+      console.log(results.map((r, i) => `${i + 1}. ${r}`).join("\n"));
+
       let text = "";
       const es = new EventSource(
         "https://api.groq.com/openai/v1/chat/completions",
