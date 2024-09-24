@@ -35,56 +35,90 @@ const CameraScreen = () => {
 
   const handleText = async () => {
     try {
-      if (!cameraRef.current) return;
-      // Take a picture and get the file URI
-      const photo = await cameraRef.current.takePictureAsync({
-        base64: true,
-      });
+      // if (!cameraRef.current) return;
+      // // Take a picture and get the file URI
+      // const photo = await cameraRef.current.takePictureAsync({
+      //   base64: true,
+      // });
 
-      // Calculate the aspect ratio
-      const aspectRatio = photo.width / photo.height;
+      // // Calculate the aspect ratio
+      // const aspectRatio = photo.width / photo.height;
 
-      // Calculate new dimensions
-      let newWidth = 1200;
-      let newHeight = 1200;
-      if (aspectRatio > 1) {
-        newHeight = newWidth / aspectRatio;
-      } else {
-        newWidth = newHeight * aspectRatio;
-      }
+      // // Calculate new dimensions
+      // let newWidth = 1200;
+      // let newHeight = 1200;
+      // if (aspectRatio > 1) {
+      //   newHeight = newWidth / aspectRatio;
+      // } else {
+      //   newWidth = newHeight * aspectRatio;
+      // }
 
-      const resizedPhoto = await manipulateAsync(
-        photo.uri,
-        [{ resize: { width: newWidth, height: newHeight } }],
-        { compress: 1, format: SaveFormat.JPEG }
-      );
-      setImage(resizedPhoto.uri);
+      // const resizedPhoto = await manipulateAsync(
+      //   photo.uri,
+      //   [{ resize: { width: newWidth, height: newHeight } }],
+      //   { compress: 1, format: SaveFormat.JPEG }
+      // );
+      // setImage(resizedPhoto.uri);
 
-      // Create a new FormData object
-      const formData = new FormData();
-      formData.append("image", {
-        uri: resizedPhoto.uri,
-        type: "image/jpeg",
-        name: "image.jpg",
-      });
+      // // Create a new FormData object
+      // const formData = new FormData();
+      // formData.append("image", {
+      //   uri: resizedPhoto.uri,
+      //   type: "image/jpeg",
+      //   name: "image.jpg",
+      // });
 
-      // Make the POST request to your server
-      const response = await fetch(
-        "https://api.bing.microsoft.com/v7.0/images/visualsearch?mkt=en-US",
-        {
-          method: "POST",
-          body: formData,
-          headers: {
-            "Ocp-Apim-Subscription-Key": "",
-          },
-        }
-      );
-      if (!response.ok) {
-        throw Error(`Error uploading image: ${response.statusText}`);
-      }
-      const data = await response.json();
-      const results = parse(data);
+      // // Make the POST request to your server
+      // const response = await fetch(
+      //   "https://api.bing.microsoft.com/v7.0/images/visualsearch?mkt=en-US",
+      //   {
+      //     method: "POST",
+      //     body: formData,
+      //     headers: {
+      //       "Ocp-Apim-Subscription-Key": "",
+      //     },
+      //   }
+      // );
+      // if (!response.ok) {
+      //   throw Error(`Error uploading image: ${response.statusText}`);
+      // }
+      // const data = await response.json();
+      // const results = parse(data);
+      const results = [
+        "Analyzing Kasper's vision - Inside The Vatican",
+        "Raffaello Sanzio's (Raphael) - Marriage of the Virgin. | Art day ...",
+        "Pinacoteca di Brera (Mailand) - Aktuelle 2019 - Lohnt es sich? (Mit fotos)",
+        "Moja Top-lista, czyli drugi spacer po Pinacoteca di Brera (post_71 ...",
+        "「ブレラ絵画館(ブレラ美術館)」完全ガイド – チケット予約・見どころ・行き方・混みぐあい",
+        "Pinacoteca di Brera (Milan, Italy): Top Tips Before You Go (with Photos ...",
+        "IMG_0228 The Marriage of the Virgin (1504), painting by Ra… | Flickr",
+        "A master visual catechist: Raphael and the Italian High Renaissance ...",
+        "Marriage of the Virgin after Raphael 'Raffaello Sanzio da Urbino', 1483 ...",
+        "The Circumcision | Marco Marzile, 1500, oil on canvas. | Brule Laker ...",
+      ];
       console.log(results.map((r, i) => `${i + 1}. ${r}`).join("\n"));
+
+      // let messages = [
+      //   {
+      //     role: "system",
+      //     content:
+      //       "You are an esteemed art history professor with expertise in " +
+      //       "identifying artworks and interpreting their content. When " +
+      //       "presented with a list of visual search results, identify the " +
+      //       "actual artwork, including its title and artist. Then, describe " +
+      //       "the specific event or moment depicted in the piece. Use the " +
+      //       "tools if necessary to gather additional information to ensure " +
+      //       "your response is accurate and complete.",
+      //   },
+      //   {
+      //     role: "user",
+      //     content:
+      //       `Here is a list of visual search results of an artwork:\n\n${results}\n\n` +
+      //       `Identify the true artwork, then describe the specific event ` +
+      //       `or moment depicted in that artwork.`,
+      //   },
+      // ];
+      // let stop = false;
 
       let text = "";
       const es = new EventSource(
@@ -122,17 +156,20 @@ const CameraScreen = () => {
         }
         const data = JSON.parse(event.data);
         const content = data.choices[0].delta.content;
-        if (content !== undefined) {
+        if (content === ".") {
+          await enqueue(text);
+          text = "";
+        } else {
           text += content;
         }
       });
 
       es.addEventListener("close", async () => {
-        const sentences = text.split(".");
-        for (let i in sentences) {
-          await enqueue(sentences[i]);
-          await new Promise((r) => setTimeout(r, 1000));
-        }
+        // const sentences = text.split(".");
+        // for (let i in sentences) {
+        //   await enqueue(sentences[i]);
+        //   await new Promise((r) => setTimeout(r, 1000));
+        // }
         es.removeAllEventListeners();
       });
     } catch (error) {
