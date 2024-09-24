@@ -11,7 +11,9 @@ import EventSource from "react-native-sse";
 const CameraScreen = () => {
   const [permission, requestPermission] = useCameraPermissions();
   const [image, setImage] = useState<string | null>(null);
-  const [queue, setQueue] = useState<string[]>([]);
+  const [textQueue, setTextQueue] = useState<string[]>([]);
+  const [isTTS, setIsTTS] = useState(false);
+  const [audioQueue, setAudioQueue] = useState<string[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const cameraRef = useRef(null);
   const router = useRouter();
@@ -96,7 +98,7 @@ const CameraScreen = () => {
         "Marriage of the Virgin after Raphael 'Raffaello Sanzio da Urbino', 1483 ...",
         "The Circumcision | Marco Marzile, 1500, oil on canvas. | Brule Laker ...",
       ];
-      console.log(results.map((r, i) => `${i + 1}. ${r}`).join("\n"));
+      // console.log(results.map((r, i) => `${i + 1}. ${r}`).join("\n"));
 
       // let messages = [
       //   {
@@ -121,6 +123,7 @@ const CameraScreen = () => {
       // let stop = false;
 
       let text = "";
+
       const es = new EventSource(
         "https://api.groq.com/openai/v1/chat/completions",
         {
@@ -149,27 +152,25 @@ const CameraScreen = () => {
 
       es.addEventListener("open", () => {});
 
-      es.addEventListener("message", async (event) => {
+      es.addEventListener("message", (event) => {
         if (event.data === "[DONE]") {
           es.close();
           return;
         }
-        const data = JSON.parse(event.data);
-        const content = data.choices[0].delta.content;
-        if (content === ".") {
-          await enqueue(text);
-          text = "";
-        } else {
-          text += content;
+        const content = JSON.parse(event.data).choices[0].delta.content;
+        switch (content) {
+          case ".":
+            setTextQueue((q) => [...q, text]);
+            text = "";
+            break;
+          case undefined:
+            break;
+          default:
+            text += content;
         }
       });
 
       es.addEventListener("close", async () => {
-        // const sentences = text.split(".");
-        // for (let i in sentences) {
-        //   await enqueue(sentences[i]);
-        //   await new Promise((r) => setTimeout(r, 1000));
-        // }
         es.removeAllEventListeners();
       });
     } catch (error) {
@@ -177,8 +178,14 @@ const CameraScreen = () => {
     }
   };
 
-  const enqueue = async (text: string) => {
+  const handleTTS = async () => {
+    // Text queue is empty, or current text is still TTS
+    if (textQueue.length <= 0 || isTTS) return;
+
     try {
+      setIsTTS(true);
+      const text = textQueue[0];
+
       // Make the POST request to the Eleven Labs TTS API
       const response = await fetch(
         `https://api.elevenlabs.io/v1/text-to-speech/nPczCjzI2devNBz1zQrb`,
@@ -223,45 +230,56 @@ const CameraScreen = () => {
       };
       reader.readAsDataURL(blob);
 
-      setQueue([...queue, path]);
+      let timeoutId = setTimeout(() => {
+        setAudioQueue((q) => [...q, path]);
+        setTextQueue((q) => q.slice(1));
+        setIsTTS(false);
+        clearTimeout(timeoutId);
+      }, 500);
     } catch (error) {
-      console.error(error);
+      console.error("TTS failed:", error);
+      setIsTTS(false);
     }
   };
 
-  const handleAudio = async () => {
-    if (queue.length > 0 && !isPlaying) {
+  const handlePlaying = async () => {
+    // Audio queue is empty, or current audio is still playing
+    if (audioQueue.length <= 0 || isPlaying) return;
+
+    try {
       setIsPlaying(true);
-      const audio = queue[0];
+      const audio = audioQueue[0];
 
-      try {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: audio },
-          { shouldPlay: true }
-        );
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audio },
+        { shouldPlay: true }
+      );
 
-        await sound.playAsync();
+      await sound.playAsync();
 
-        // Wait for the audio to finish playing
-        let intervalId = setInterval(async () => {
-          const status = await sound.getStatusAsync();
-          if (!status.isPlaying) {
-            await sound.unloadAsync();
-            setQueue((prevQueue) => prevQueue.slice(1));
-            setIsPlaying(false);
-            clearInterval(intervalId);
-          }
-        }, 300);
-      } catch (error) {
-        console.error("Error playing audio:", error);
-        setIsPlaying(false);
-      }
+      // Wait for the audio to finish playing
+      let intervalId = setInterval(async () => {
+        const status = await sound.getStatusAsync();
+        if (!status.isPlaying) {
+          await sound.unloadAsync();
+          setAudioQueue((q) => q.slice(1));
+          setIsPlaying(false);
+          clearInterval(intervalId);
+        }
+      }, 200);
+    } catch (error) {
+      console.error("Playing audio failed:", error);
+      setIsPlaying(false);
     }
   };
 
   useEffect(() => {
-    handleAudio();
-  }, [queue, isPlaying]);
+    handleTTS();
+  }, [textQueue, isTTS]);
+
+  useEffect(() => {
+    handlePlaying();
+  }, [audioQueue, isPlaying]);
 
   if (!permission) {
     return <View />;
