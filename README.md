@@ -1,50 +1,34 @@
-# Welcome to your Expo app 👋
+# AI Travel Companion
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+![](assets\images\TravelAI.png)
 
-## Get started
+## Overview
 
-1. Install dependencies
+AI Travel Companion is an innovative mobile app designed to enhance your travel experience by providing rich backstories and historical details about artwork, sculptures, buildings, and other cultural landmarks. Simply take a picture of the artwork, and the app will quickly deliver an audio narrative, helping you appreciate its beauty and meaning in real-time.
 
-   ```bash
-   npm install
-   ```
+Whether you're exploring famous museums, historical cities, or hidden cultural gems, this app makes it easy to connect with the stories behind what you're seeing.
 
-2. Start the app
+## Key Features
 
-   ```bash
-    npx expo start
-   ```
+Take a picture of any artwork, sculpture, or building and listen to its backstory
+Real-time AI-powered image recognition
+Audio playback for convenient, hands-free learning
 
-In the output, you'll find options to open the app in a
+## Installation & Setup
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+To try the app on your local machine, follow these steps:
 
 ```bash
-npm run reset-project
+npm install && npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Follow the on-screen instructions to run the app on an emulator or scan the QR code with the Expo Go app on your mobile device.
 
-## Learn more
+## Coming Soon
+Android and iOS apps will be available soon on their respective app stores.
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Future Features (Planned)
+- [ ] AI Agent for artwork visual search
+- [ ] AI Agent for travel planning and cost optimization
+- [ ] AI Agent for booking fly tickets directly within the app
+- [ ] AI Agent for accommodation reservation integration (hotels, Airbnb, etc.)
