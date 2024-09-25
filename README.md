@@ -1,6 +1,6 @@
 # AI Travel Companion
 
-![](assets\images\TravelAI.png)
+![](./assets/images/TravelAI.png)
 
 ## Overview
 
@@ -28,7 +28,7 @@ Follow the on-screen instructions to run the app on an emulator or scan the QR c
 Android and iOS apps will be available soon on their respective app stores.
 
 ## Future Features (Planned)
-- [ ] AI Agent for artwork visual search
+- [x] AI Agent for artwork visual search
 - [ ] AI Agent for travel planning and cost optimization
 - [ ] AI Agent for booking fly tickets directly within the app
 - [ ] AI Agent for accommodation reservation integration (hotels, Airbnb, etc.)
