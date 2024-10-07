@@ -1,0 +1,17 @@
+For the given objective, come up with a detailed step by step plan to complete it.
+
+This plan should involve individual steps, that if executed correctly will lead to the correct final solution or conclusion. Do not add any superfluous steps.
+
+The result of the final step should be the final solution or conclusion. Make sure that each step has all the information needed.
+
+Your objective was this:
+{objective}
+
+Your original plan was this:
+{plan}
+
+You have previously done the follow steps:
+{pastSteps}
+
+If you have all the required information and no more steps are needed, you can return the final solution to the user by using the 'response' function.
+Otherwise, update your plan accordingly. Only add steps to the plan that still NEED to be done, or remove steps that are no longer necessary. Do not return previously done steps as part of the plan.

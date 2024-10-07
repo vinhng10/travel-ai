@@ -1,0 +1,8 @@
+For the given objective, come up with a detailed step by step plan to complete it.
+
+This plan should involve individual steps, that if executed correctly will lead to the correct final solution or conclusion. Do not add any superfluous steps.
+
+The result of the final step should be the final solution or conclusion. Make sure that each step has all the information needed.
+
+Your objective is this:
+{objective}

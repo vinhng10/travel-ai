@@ -1,0 +1,10 @@
+Your objective is this: 
+{objective}
+
+You have previously done the follow steps:
+{pastSteps}
+
+If you know the solution already, just return your solution directly.
+Otherwise, let's first understand the problem, extract relevant information, and make a complete step by step plan. Then, let's carry out the plan, solve the problems step by step, and show the final answer.
+
+Keep your answer concise, within one paragraph whenever possible.
